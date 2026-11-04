@@ -1,7 +1,8 @@
 // scripts/live-toast-macos.mjs — REAL native notification capture on macOS.
 //
 // The macOS analog of live-toast-linux.mjs. Fires a notification through our
-// actual macOS backend (src/platforms/macos.mjs → osascript) and asserts it was
+// actual macOS backend (src/platforms/macos.mjs → osascript; the runner has no
+// terminal-notifier, so the click-to-focus path is not exercised here) and asserts it was
 // DELIVERED by reading Notification Center's SQLite DB — not by trusting the
 // osascript exit code (which is 0 even when the banner is silently dropped).
 //

@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { logHookError } from '../error-log.mjs';
 import { execFailureReason, noteFailure } from '../channel-failure.mjs';
 import { playFirst, prepareSoundFile } from './sound.mjs';
+import { findTerminalNotifier, focusArgs } from './macos-focus.mjs';
 
 // The 14 built-in macOS system sounds (files in /System/Library/Sounds).
 const MAC_SYSTEM_SOUNDS = new Set([
@@ -16,6 +17,10 @@ const MAC_SYSTEM_SOUNDS = new Set([
 // Default/unknown so the system default sound plays.
 const WINDOWS_TO_MAC_SOUND = { IM: 'Glass', Reminder: 'Ping', Mail: 'Purr', SMS: 'Tink' };
 
+// terminal-notifier's name for the system default sound (osascript gets it by
+// omitting the sound clause).
+const NOTIFIER_DEFAULT_SOUND = 'default';
+
 export function macSoundName(toastSound) {
   if (!toastSound || toastSound === 'Default') return null;
   if (MAC_SYSTEM_SOUNDS.has(toastSound)) return toastSound;
@@ -24,10 +29,45 @@ export function macSoundName(toastSound) {
   return null;
 }
 
-// deps are injectable for tests: execFile, the spawn that starts afplay, and
-// the error logger.
+// The osascript backend: `display notification`. Always available, but the
+// banner belongs to Script Editor, so a click opens Script Editor.
+export function osascriptArgs(notification, { sound, silent = false } = {}) {
+  const soundClause = !silent && sound ? ` sound name "${esc(sound)}"` : '';
+  return ['-e', `display notification "${esc(notification.message)}" with title "${esc(notification.title)}"${soundClause}`];
+}
+
+// The terminal-notifier backend, used when it is installed and the toast is
+// click-to-focus (usage/context alerts opt out: there is no window to focus).
+// `focus` is what focusArgs() found: the click selects the agent's tab, raises
+// its app, or does nothing. `silent` keeps a custom sound file (already playing
+// through afplay) from doubling with the default sound.
+export function terminalNotifierArgs(notification, { sound, silent = false, focus = [] } = {}) {
+  const args = ['-title', optionValue(notification.title), '-message', optionValue(notification.message)];
+  if (!silent) args.push('-sound', sound || NOTIFIER_DEFAULT_SOUND);
+  return args.concat(focus);
+}
+
+// terminal-notifier reads its options through NSUserDefaults, which parses a
+// value that starts with `[`, `(`, `{`, a quote or `-` as something else (a
+// plist, another option) and exits 2. Its own help says to escape such a value
+// with a backslash, and the backslash is not shown (verified with 3.1.0).
+const NEEDS_ESCAPE = /^[[({"'\-]/;
+
+export function optionValue(value) {
+  const text = String(value ?? '');
+  return NEEDS_ESCAPE.test(text) ? `\\${text}` : text;
+}
+
+// deps are injectable for tests: execFile, the spawn that starts afplay, the
+// error logger, the terminal-notifier lookup and the focus-argument builder.
 export async function sendToast(notification, deps = {}) {
-  const { execFileImpl = execFile, log = logHookError, ...soundDeps } = deps;
+  const {
+    execFileImpl = execFile,
+    log = logHookError,
+    notifier = findTerminalNotifier,
+    focus = focusArgs,
+    ...soundDeps
+  } = deps;
 
   // A custom sound file is played by afplay (detached, so the hook does not wait
   // for it) and the notification carries no sound clause. macSoundName(path) is
@@ -35,14 +75,16 @@ export async function sendToast(notification, deps = {}) {
   const file = prepareSoundFile(notification.toastSound, 'toast:macos', { log, ...soundDeps });
   if (file) await playFirst([['afplay', [file]]], 'toast:macos', { log, ...soundDeps });
 
-  return new Promise((resolve) => {
-    const sound = macSoundName(notification.toastSound);
-    const soundClause = sound ? ` sound name "${esc(sound)}"` : '';
-    const script = `display notification "${esc(notification.message)}" with title "${esc(notification.title)}"${soundClause}`;
+  const sound = macSoundName(notification.toastSound);
+  const notifierPath = notification.clickToFocus === false ? null : notifier();
+  const [bin, args] = notifierPath
+    ? [notifierPath, terminalNotifierArgs(notification, { sound, silent: Boolean(file), focus: focus() })]
+    : ['osascript', osascriptArgs(notification, { sound, silent: Boolean(file) })];
 
-    execFileImpl('osascript', ['-e', script], { timeout: 5000 }, (err, stdout, stderr) => {
+  return new Promise((resolve) => {
+    execFileImpl(bin, args, { timeout: 5000 }, (err, stdout, stderr) => {
       if (err) {
-        log('toast:macos', err, { stderr: (stderr || '').slice(0, 400) });
+        log('toast:macos', err, { backend: bin, stderr: (stderr || '').slice(0, 400) });
         noteFailure('toast', execFailureReason(err));
       }
       resolve(!err);

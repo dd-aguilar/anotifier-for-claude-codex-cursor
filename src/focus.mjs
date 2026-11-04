@@ -107,18 +107,21 @@ const SHELL_WINDOWS = new Set([
   'lockapp', 'logonui', 'dwm',
 ]);
 
-const MAC_BUNDLES_BY_TERM_PROGRAM = {
-  Apple_Terminal: ['com.apple.terminal'],
+// TERM_PROGRAM -> bundle ids, the first one canonical, in the case the app
+// declares (platforms/macos-focus.mjs hands it to terminal-notifier -activate);
+// comparisons here lowercase both sides.
+export const MAC_BUNDLES_BY_TERM_PROGRAM = {
+  Apple_Terminal: ['com.apple.Terminal'],
   'iTerm.app': ['com.googlecode.iterm2'],
-  WarpTerminal: ['dev.warp.warp-stable', 'dev.warp.warp'],
+  WarpTerminal: ['dev.warp.Warp-Stable', 'dev.warp.Warp'],
   ghostty: ['com.mitchellh.ghostty'],
   WezTerm: ['com.github.wez.wezterm'],
   Hyper: ['co.zeit.hyper'],
   alacritty: ['org.alacritty'],
   kitty: ['net.kovidgoyal.kitty'],
-  vscode: ['com.microsoft.vscode', 'com.microsoft.vscodeinsiders', 'com.todesktop.230313mzl4w4u92', 'com.exafunction.windsurf', 'com.vscodium'],
+  vscode: ['com.microsoft.VSCode', 'com.microsoft.VSCodeInsiders', 'com.todesktop.230313mzl4w4u92', 'com.exafunction.windsurf', 'com.vscodium'],
 };
-const MAC_EDITOR_BUNDLES = new Set(MAC_BUNDLES_BY_TERM_PROGRAM.vscode);
+const MAC_EDITOR_BUNDLES = new Set(MAC_BUNDLES_BY_TERM_PROGRAM.vscode.map((s) => s.toLowerCase()));
 
 function defaultExec(file, args, { timeout, signal } = {}) {
   return new Promise((resolve, reject) => {

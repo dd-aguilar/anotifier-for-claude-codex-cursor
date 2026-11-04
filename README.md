@@ -69,7 +69,7 @@ That's it. The setup wizard detects your platform and installed AI tools, wires 
 - **Webhook notifications** -- Slack, Discord, Telegram, or any HTTP endpoint, with an optional auth header
 - **Rich notification content** -- Claude Code toasts and webhooks show what the agent actually said or asked, not a generic line
 - **Terminal bell** -- audible ding in the terminal that launched the agent (works over SSH/tmux)
-- **Click-to-focus** -- click the toast to jump back to the terminal or VS Code window (Windows)
+- **Click-to-focus** -- click the toast to jump back to the terminal or editor window (Windows; macOS with [terminal-notifier](https://github.com/julienXX/terminal-notifier) installed)
 - **Turn length** -- "task complete" says how long the turn took (`took 4m 12s`), and `minDurationSeconds` can skip quick turns (Claude Code, Codex, Gemini CLI)
 - **Codex approval alerts** -- get notified the instant Codex asks for permission, not just when it finishes
 - **Per-tool branded icons** -- each tool gets its own logo in the notification
@@ -592,7 +592,8 @@ Hook fires (stdin JSON + --source flag)
 
 ### macOS
 
-- Uses built-in `osascript` -- zero additional dependencies
+- Uses built-in `osascript` -- zero additional dependencies. A notification sent this way belongs to Script Editor, so clicking it opens Script Editor.
+- Click-to-focus with [terminal-notifier](https://github.com/julienXX/terminal-notifier): `brew install terminal-notifier`, allow it once in System Settings → Notifications, and every toast with `toast.clickToFocus` on is sent through it instead. A click then selects the tab that ran the agent in Apple Terminal (found through the hook's tty), or brings the app that owns the agent's shell to the front for any other terminal or editor (iTerm2, JetBrains IDEs, VS Code, Warp, Ghostty, kitty…, from `__CFBundleIdentifier` or `TERM_PROGRAM`). Under tmux/screen/zellij or from an IDE panel there is no usable tty, so the app is raised without selecting a tab; over ssh the click does nothing. Usage-limit and context warnings keep the `osascript` path (there is no window to focus). `anotifier status` shows which backend is in use and `anotifier doctor` says what a click will do and whether terminal-notifier is allowed to post notifications. Proof boundary: the click-through is verified by hand for app-level focus (a JetBrains IDE); the Apple Terminal tab script is unit-tested and was run against a real tab, but a click selecting a tab has not been verified end to end.
 
 ### Linux
 

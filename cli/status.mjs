@@ -13,6 +13,7 @@ import { effectiveContextThreshold } from '../src/context-alert.mjs';
 import { minDurationSeconds } from '../src/turn-timer.mjs';
 import { SUPPORT_LINE } from '../src/support.mjs';
 import { toastPlatform } from '../src/platforms/index.mjs';
+import { findTerminalNotifier, TERMINAL_NOTIFIER_INSTALL_HINT } from '../src/platforms/macos-focus.mjs';
 import { toastOffNoBackendLabel } from './toast-backend.mjs';
 import { c, box, kv, sectionHeader } from './ui.mjs';
 
@@ -29,6 +30,19 @@ export const PLATFORM_DISPLAY = {
   wsl: { platform: 'WSL', toast: 'Windows toast (WSL interop)' },
   linux: { platform: 'Linux', toast: 'notify-send' },
 };
+
+// macOS sends through terminal-notifier when it is installed (then the toast is
+// click-to-focus) and through osascript otherwise; status says which.
+export function toastDisplay(platform, { notifier = findTerminalNotifier } = {}) {
+  const base = PLATFORM_DISPLAY[platform];
+  if (platform !== 'darwin' || !notifier()) return base;
+  return { ...base, toast: 'terminal-notifier' };
+}
+
+export function clickToFocusLabel(platform, { notifier = findTerminalNotifier } = {}) {
+  if (platform !== 'darwin') return 'click-to-focus';
+  return notifier() ? 'click-to-focus' : `click-to-focus needs: ${TERMINAL_NOTIFIER_INSTALL_HINT}`;
+}
 
 function webhookOrigin(url) {
   try { return new URL(url).origin; } catch { return 'invalid URL'; }
@@ -96,8 +110,8 @@ export async function run() {
     return;
   }
 
-  const { platform: platLabel, toast: toastLabel } = PLATFORM_DISPLAY[toastPlatform()];
-  const toastExtra = config.toast?.clickToFocus ? c.muted(' (click-to-focus)') : '';
+  const { platform: platLabel, toast: toastLabel } = toastDisplay(toastPlatform());
+  const toastExtra = config.toast?.clickToFocus ? c.muted(` (${clickToFocusLabel(toastPlatform())})`) : '';
 
   const toastOff = toastOffNoBackendLabel(config, toastPlatform());
   const toastValue = toastOff ? c.warn(`toast: ${toastOff}`) : `${toastLabel}${toastExtra}`;
