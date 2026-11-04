@@ -13,7 +13,6 @@ import {
   focusTargetLabel,
   terminalNotifierAuthState,
   TERMINAL_NOTIFIER_BUNDLE,
-  TAB_FOCUS_BUNDLES,
 } from '../src/platforms/macos-focus.mjs';
 import { sendToast, osascriptArgs, terminalNotifierArgs, optionValue } from '../src/platforms/macos.mjs';
 import { notificationAuthState } from '../src/platforms/macos-delivery.mjs';
@@ -119,34 +118,32 @@ describe('focusCommand — the shell command terminal-notifier runs on click', (
     assert.equal(focusCommand(TERMINAL, '/dev/ttys003"; say hi; "'), null);
     assert.equal(focusCommand(TERMINAL, 'ttys003'), null);
   });
-
-  it('TAB_FOCUS_BUNDLES lists exactly the apps with a tab script', () => {
-    assert.deepEqual(TAB_FOCUS_BUNDLES, [TERMINAL]);
-  });
 });
 
 describe('focusArgs — what the click does, best answer first', () => {
+  const ttyOf = () => '/dev/ttys003';
+  const noTty = () => null;
+
   it('-execute with the tab script when the app has one and the tty is known', () => {
-    const args = focusArgs({ env: { __CFBundleIdentifier: TERMINAL }, tty: '/dev/ttys003' });
+    const args = focusArgs({ env: { __CFBundleIdentifier: TERMINAL }, ttyOf });
     assert.equal(args[0], '-execute');
     assert.equal(args[1], focusCommand(TERMINAL, '/dev/ttys003'));
   });
 
   it('-activate when the tty is unknown (IDE panel, tmux) or the app has no tab script', () => {
-    assert.deepEqual(focusArgs({ env: { __CFBundleIdentifier: TERMINAL }, tty: null }), ['-activate', TERMINAL]);
-    assert.deepEqual(focusArgs({ env: { __CFBundleIdentifier: 'com.jetbrains.pycharm' }, tty: '/dev/ttys003' }), ['-activate', 'com.jetbrains.pycharm']);
-    assert.deepEqual(focusArgs({ env: { TERM_PROGRAM: 'iTerm.app' }, tty: '/dev/ttys003' }), ['-activate', 'com.googlecode.iterm2']);
+    assert.deepEqual(focusArgs({ env: { __CFBundleIdentifier: TERMINAL }, ttyOf: noTty }), ['-activate', TERMINAL]);
+    assert.deepEqual(focusArgs({ env: { __CFBundleIdentifier: 'com.jetbrains.pycharm' }, ttyOf }), ['-activate', 'com.jetbrains.pycharm']);
+    assert.deepEqual(focusArgs({ env: { TERM_PROGRAM: 'iTerm.app' }, ttyOf }), ['-activate', 'com.googlecode.iterm2']);
   });
 
   it('nothing when no terminal app is known', () => {
-    assert.deepEqual(focusArgs({ env: {}, tty: '/dev/ttys003' }), []);
-    assert.deepEqual(focusArgs({ env: { __CFBundleIdentifier: TERMINAL, SSH_CLIENT: 'x' }, tty: '/dev/ttys003' }), []);
+    assert.deepEqual(focusArgs({ env: {}, ttyOf }), []);
+    assert.deepEqual(focusArgs({ env: { __CFBundleIdentifier: TERMINAL, SSH_CLIENT: 'x' }, ttyOf }), []);
   });
 
-  it('does not look the tty up when the app could not use it', () => {
-    // tty undefined would trigger controllingTty, which runs ps. For an app
-    // without a tab script that lookup is skipped: -activate needs no tty.
-    assert.deepEqual(focusArgs({ env: { __CFBundleIdentifier: 'com.jetbrains.pycharm', TMUX: '1' } }), ['-activate', 'com.jetbrains.pycharm']);
+  it('does not look the tty up (no ps run) for an app without a tab script', () => {
+    const neverCalled = () => { throw new Error('ps should not run'); };
+    assert.deepEqual(focusArgs({ env: { __CFBundleIdentifier: 'com.jetbrains.pycharm' }, ttyOf: neverCalled }), ['-activate', 'com.jetbrains.pycharm']);
   });
 });
 
@@ -280,7 +277,9 @@ describe('terminalNotifierAuthState — from terminal-notifier -diagnose', () =>
   it('unknown when it is not installed or -diagnose fails', () => {
     assert.equal(terminalNotifierAuthState({ notifier: null }).state, 'unknown');
     assert.equal(terminalNotifierAuthState({ notifier: NOTIFIER, run: () => { throw new Error('x'); } }).state, 'unknown');
-    assert.equal(terminalNotifierAuthState({ notifier: NOTIFIER, run: () => 'garbage' }).state, 'unknown');
+    const garbage = terminalNotifierAuthState({ notifier: NOTIFIER, run: () => 'garbage' });
+    assert.equal(garbage.state, 'unknown');
+    assert.match(garbage.detail, /unreadable/);
   });
 });
 
