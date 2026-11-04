@@ -314,8 +314,8 @@ export const DOCS: DocSection[] = [
               ],
               [
                 "macOS",
-                "osascript",
-                "Built in. Windows sound names are mapped to the closest system sound; unknown names fall back to the default sound.",
+                "osascript, or terminal-notifier when installed",
+                "Built in. Windows sound names are mapped to the closest system sound; unknown names fall back to the default sound. With `brew install terminal-notifier` the toast is click-to-focus: a click selects the agent's tab in Apple Terminal, or brings the terminal or editor that runs the agent to the front.",
               ],
               [
                 "Linux",
@@ -509,7 +509,7 @@ export const DOCS: DocSection[] = [
             "`toast.clickToFocus`",
             "boolean",
             "`true`",
-            "Clicking the toast focuses the originating window (Windows); [how it picks the window](/guides/windows-wsl-notifications/#click-to-focus).",
+            "Clicking the toast focuses the originating window (Windows, and macOS with terminal-notifier installed); [how it picks the window](/guides/windows-wsl-notifications/#click-to-focus).",
           ],
           [
             "`toast.richContent`",
@@ -843,7 +843,7 @@ export const DOCS_FAQ: DocFaq[] = [
   },
   {
     q: "Can I approve Codex or Claude permission prompts from my phone?",
-    a: "Not yet. anotifier alerts you the instant an approval is requested and, on Windows, click-to-focus brings you back to the right window, but the decision is made at the keyboard. Remote Allow/Deny is on the roadmap pending a security design.",
+    a: "Not yet. anotifier alerts you the instant an approval is requested and, on Windows and on macOS with terminal-notifier, click-to-focus brings you back to the right window, but the decision is made at the keyboard. Remote Allow/Deny is on the roadmap pending a security design.",
   },
   {
     q: "How do I stop getting a notification for one event?",

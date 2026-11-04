@@ -5,6 +5,7 @@ import os from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { notificationAuthState, verifyDelivery, ncDbPath } from '../src/platforms/macos-delivery.mjs';
 import { toastPlatform } from '../src/platforms/index.mjs';
+import { findTerminalNotifier, focusTargetLabel, TERMINAL_NOTIFIER_INSTALL_HINT } from '../src/platforms/macos-focus.mjs';
 import { findWslPowerShell } from '../src/platforms/wsl.mjs';
 import { checkSoundFile, isSoundFilePath } from '../src/platforms/sound.mjs';
 import { toastOffBySetup, toastOffNoBackendLabel, probeCommand } from './toast-backend.mjs';
@@ -60,9 +61,15 @@ export function wslToastBackendCheck({ hasBin = has, findPowerShell = findWslPow
 
 function toastBackendCheck(p) {
   if (p === 'darwin') {
-    return has('osascript')
-      ? { id: 'toast-backend', channel: 'toast', status: 'ok', detail: 'osascript present' }
-      : { id: 'toast-backend', channel: 'toast', status: 'fail', detail: 'osascript missing', hint: 'macOS should always ship osascript' };
+    if (!has('osascript')) {
+      return { id: 'toast-backend', channel: 'toast', status: 'fail', detail: 'osascript missing', hint: 'macOS should always ship osascript' };
+    }
+    // terminal-notifier is optional: with it the toast is click-to-focus, without
+    // it a click opens Script Editor (see README, Platform Details → macOS).
+    const notifier = findTerminalNotifier();
+    return notifier
+      ? { id: 'toast-backend', channel: 'toast', status: 'ok', detail: `terminal-notifier present (${notifier}); ${focusTargetLabel()}` }
+      : { id: 'toast-backend', channel: 'toast', status: 'ok', detail: 'osascript present; a click on the toast opens Script Editor', hint: `for click-to-focus: ${TERMINAL_NOTIFIER_INSTALL_HINT}` };
   }
   if (p === 'linux') {
     return has('notify-send')
@@ -210,7 +217,7 @@ function focusCheck() {
 }
 
 async function toastAuthCheck(deep, strict) {
-  const auth = notificationAuthState();
+  const auth = notificationAuthState({ owner: findTerminalNotifier() ? 'terminal-notifier' : 'osascript' });
   let status = auth.state === 'authorized' ? 'ok' : auth.state === 'unauthorized' ? 'warn' : 'warn';
   const base = { id: 'toast-auth', channel: 'toast', status, detail: auth.detail };
   if (!deep) return base;

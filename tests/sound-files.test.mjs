@@ -221,11 +221,14 @@ describe('windows sendToast with a sound file', () => {
 
 describe('macos sendToast with a sound file', () => {
   const note = (toastSound) => ({ title: 'T', message: 'M', toastSound });
+  // The osascript backend: a host with terminal-notifier would otherwise take
+  // the click-to-focus path (covered in macos-focus.test.mjs).
+  const noNotifier = () => null;
 
   it('plays the file with afplay and sends the notification without a sound clause', async () => {
     const { spawnImpl, calls } = fakeSpawn();
     const toast = fakeExecFile();
-    assert.equal(await macToast(note(wav), { spawnImpl, execFileImpl: toast.execFileImpl, log: () => {} }), true);
+    assert.equal(await macToast(note(wav), { spawnImpl, execFileImpl: toast.execFileImpl, log: () => {}, notifier: noNotifier }), true);
     assert.deepEqual([calls[0].command, calls[0].args], ['afplay', [wav]]);
     const script = toast.calls[0].args[1];
     assert.match(script, /^display notification "M" with title "T"$/);
@@ -236,7 +239,7 @@ describe('macos sendToast with a sound file', () => {
     const { spawnImpl, calls } = fakeSpawn();
     const toast = fakeExecFile();
     const { entries, log } = logger();
-    assert.equal(await macToast(note(path.join(dir, 'gone.aiff')), { spawnImpl, execFileImpl: toast.execFileImpl, log }), true);
+    assert.equal(await macToast(note(path.join(dir, 'gone.aiff')), { spawnImpl, execFileImpl: toast.execFileImpl, log, notifier: noNotifier }), true);
     assert.equal(calls.length, 0);
     assert.equal(entries.length, 1);
     assert.ok(!toast.calls[0].args[1].includes('sound name'));
@@ -244,7 +247,7 @@ describe('macos sendToast with a sound file', () => {
 
   it('a sound name still maps to a system sound', async () => {
     const toast = fakeExecFile();
-    await macToast(note('IM'), { spawnImpl: fakeSpawn().spawnImpl, execFileImpl: toast.execFileImpl, log: () => {} });
+    await macToast(note('IM'), { spawnImpl: fakeSpawn().spawnImpl, execFileImpl: toast.execFileImpl, log: () => {}, notifier: noNotifier });
     assert.match(toast.calls[0].args[1], /sound name "Glass"$/);
   });
 });

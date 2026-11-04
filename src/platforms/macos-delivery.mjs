@@ -18,6 +18,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { terminalNotifierAuthState } from './macos-focus.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -223,12 +224,15 @@ export function parseNcprefsApps(xml) {
   return out;
 }
 
-// Read com.apple.ncprefs.plist and classify the app that owns osascript-posted
-// notifications on this host. Returns { state, app?, detail }.
-export function notificationAuthState() {
+// Read com.apple.ncprefs.plist and classify the app that owns our notifications
+// on this host. Returns { state, app?, detail }. `owner` is the backend in use:
+// 'osascript' (the default) or 'terminal-notifier' (src/platforms/macos-focus.mjs).
+export function notificationAuthState({ owner = 'osascript' } = {}) {
   if (os.platform() !== 'darwin') {
     return { state: 'unknown', detail: 'not macOS' };
   }
+  // ncprefs does not list terminal-notifier; it reports on itself.
+  if (owner === 'terminal-notifier') return terminalNotifierAuthState();
   const plist = path.join(os.homedir(), 'Library', 'Preferences', 'com.apple.ncprefs.plist');
   let apps;
   try {
